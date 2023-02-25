@@ -22,12 +22,14 @@ This includes: LossComputeBase and the standard NMTLossCompute, and
                sharded loss compute stuff.
 """
 from __future__ import division
+from __future__ import absolute_import
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
 import onmt
 import onmt.io
+from six.moves import zip
 
 
 class LossComputeBase(nn.Module):
@@ -146,7 +148,7 @@ class LossComputeBase(nn.Module):
     def _stats(self, loss, scores, target):
         """
         Args:
-            loss (:obj:`FloatTensor`): the loss computed by the loss criterion.
+            loss (:obj:`float`): the loss computed by the loss criterion.
             scores (:obj:`FloatTensor`): a score for each possible output
             target (:obj:`FloatTensor`): true targets
 
@@ -158,7 +160,7 @@ class LossComputeBase(nn.Module):
         num_correct = pred.eq(target) \
                           .masked_select(non_padding) \
                           .sum()
-        return onmt.Statistics(loss[0], non_padding.sum(), num_correct)
+        return onmt.Statistics(loss, non_padding.sum(), num_correct)
 
     def _bottle(self, v):
         return v.view(-1, v.size(2))
@@ -262,8 +264,8 @@ def shards(state, shard_size, eval=False):
         # want a sequence of dictionaries of tensors.
         # First, unzip the dictionary into a sequence of keys and a
         # sequence of tensor-like sequences.
-        keys, values = zip(*((k, torch.split(v, shard_size))
-                             for k, v in non_none.items()))
+        keys, values = list(zip(*((k, torch.split(v, shard_size))
+                             for k, v in non_none.items())))
 
         # Now, yield a dictionary for each shard. The keys are always
         # the same. values is a sequence of length #keys where each
@@ -277,5 +279,5 @@ def shards(state, shard_size, eval=False):
         # Assumed backprop'd
         variables = ((state[k], v.grad.data) for k, v in non_none.items()
                      if isinstance(v, Variable) and v.grad is not None)
-        inputs, grads = zip(*variables)
+        inputs, grads = list(zip(*variables))
         torch.autograd.backward(inputs, grads)
